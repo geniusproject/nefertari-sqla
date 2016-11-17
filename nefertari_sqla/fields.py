@@ -95,7 +95,7 @@ class BaseField(Column):
             * type_kw: dict of type-specific kwargs
             * cleaned_kw: input kwargs cleaned from type-specific args
         """
-        self._custom_analyzer = kwargs.get('custom_analyzer', False) or self._custom_analyzer
+        self._custom_analyzer = kwargs.get('custom_analyzer', None)
 
         type_kw = dict()
         type_args = ()
