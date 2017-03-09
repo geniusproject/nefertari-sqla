@@ -15,14 +15,15 @@ from pyramid_sqlalchemy import Session, BaseObject
 from sqlalchemy_utils.types.json import JSONType
 from sqlalchemy.orm.dynamic import AppenderQuery
 
+from nefertari.elasticsearch import ES
 from nefertari.json_httpexceptions import (
     JHTTPBadRequest, JHTTPNotFound, JHTTPConflict)
 from nefertari.utils import (
     process_fields, process_limit, _split, dictset,
     drop_reserved_params)
-
 from nefertari.utils.data import DocumentView
 from nefertari.utils import SingletonMeta
+
 from .signals import ESMetaclass, on_bulk_delete
 from .fields import ListField, DictField, IntegerField
 from . import types
@@ -645,7 +646,7 @@ class BaseMixin(object):
 
     @classmethod
     def _delete_many(cls, items, request=None,
-                     synchronize_session=False):
+                     synchronize_session=False, reindex=True):
         """ Delete :items: queryset or objects list.
 
         When queryset passed, Query.delete() is used to delete it but
@@ -666,7 +667,12 @@ class BaseMixin(object):
             del_count = del_queryset.delete(
                 synchronize_session=synchronize_session)
             on_bulk_delete(cls, del_items, request)
-            return del_count
+            if reindex:
+                # Reindex relationships
+                ES.bulk_index_relations(del_items, request=request)
+                return del_count
+            else:
+                return del_items
         items_count = len(items)
         session = cls.session_factory()
         for item in items:

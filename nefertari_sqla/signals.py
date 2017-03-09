@@ -104,8 +104,6 @@ def on_bulk_delete(model_cls, objects, request):
     es = ES(source=model_cls.__name__)
     es.delete(ids, request=request)
     model_cls.bulk_expire_parents(objects)
-    # Reindex relationships
-    es.bulk_index_relations(objects, request=request)
 
 
 def setup_es_signals_for(source_cls):
