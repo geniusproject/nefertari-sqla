@@ -120,8 +120,11 @@ class Choice(types.TypeDecorator):
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', ())
-        if not isinstance(self.choices, (list, tuple, set)):
-            self.choices = [self.choices]
+
+        if isinstance(self.choices, dict):
+            self.choices = set(self.choices.keys())
+        elif not isinstance(self.choices, (list, tuple, set)):
+            self.choices = (self.choices,)
         super(Choice, self).__init__(*args, **kwargs)
 
     def process_bind_param(self, value, dialect):
@@ -168,9 +171,12 @@ class ChoiceArray(types.TypeDecorator):
 
     def __init__(self, *args, **kwargs):
         self.choices = kwargs.pop('choices', None)
-        if self.choices is not None and not isinstance(
+
+        if isinstance(self.choices, dict):
+            self.choices = set(self.choices.keys())
+        elif self.choices is not None and not isinstance(
                 self.choices, (list, tuple, set)):
-            self.choices = [self.choices]
+            self.choices = (self.choices,)
         self.kwargs = kwargs
         super(ChoiceArray, self).__init__(*args, **kwargs)
 
