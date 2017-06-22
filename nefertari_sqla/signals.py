@@ -25,6 +25,10 @@ def on_after_insert(mapper, connection, target):
     pk_field = target.pk_field()
     reloaded = model_cls.get_item(
         **{pk_field: getattr(target, pk_field)})
+
+    # update parent on insert for avoid issue with concurrent indexation for nested documents
+    for parent, backref_name in reloaded.get_parent_documents(nested_only=True):
+        object_session(parent).expire(parent)
     index_object(reloaded, request=request)
 
 
