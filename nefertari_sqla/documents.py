@@ -1158,7 +1158,9 @@ class BaseDocument(BaseObject, BaseMixin):
         self._request = request
         session = session or self.session_factory()
         try:
-            session.add(self)
+            if self not in session:
+                session.add(self)
+                
             session.flush()
             session.expire(self)
             return self
@@ -1176,7 +1178,10 @@ class BaseDocument(BaseObject, BaseMixin):
         try:
             self._update(params)
             session = object_session(self)
-            session.add(self)
+
+            if self not in session:
+                session.add(self)
+
             session.flush()
             return self
         except (IntegrityError,) as e:
