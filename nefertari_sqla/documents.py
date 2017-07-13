@@ -1,5 +1,6 @@
 import copy
 import logging
+from collections import defaultdict
 
 import six
 from sqlalchemy import text, inspect
