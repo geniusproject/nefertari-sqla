@@ -1155,6 +1155,7 @@ class BaseDocument(BaseObject, BaseMixin):
     """
     __abstract__ = True
     _watchers = defaultdict(list)
+    _sort_methods = {}
 
 
     def save(self):
@@ -1228,6 +1229,14 @@ class BaseDocument(BaseObject, BaseMixin):
     @classmethod
     def add_field_watcher(cls, field_name, callback):
         cls._watchers[field_name].append(callback)
+
+    @classmethod
+    def add_sort_method(cls, sort_name, method):
+        cls._sort_methods[sort_name] = method
+
+    @classmethod
+    def get_sort_method(cls, sort_name):
+        return cls._sort_methods.get(sort_name)
 
 
 class ESBaseDocument(six.with_metaclass(ESMetaclass, BaseDocument)):
