@@ -8,6 +8,7 @@ from sqlalchemy.orm.exc import MultipleResultsFound, NoResultFound
 from sqlalchemy.orm.collections import InstrumentedList
 from sqlalchemy.exc import IntegrityError
 
+from nefertari_sqla import ESMetaclass
 from .. import documents as docs
 from .. import fields
 from .fixtures import memory_db, db_session, simple_model
@@ -763,8 +764,10 @@ class TestBaseDocument(object):
     def teardown_method(self, method):
         docs.SessionHolder().restore_default()
 
-    # expire parent in current session for updating data if child was deleted
     def test_expire_parents(self, memory_db, db_session):
+        """
+        expire parent in current session for updating data if child was deleted
+        """
         class ChildA(docs.BaseDocument):
             __tablename__ = 'childA'
             id = fields.IdField(primary_key=True)
@@ -823,6 +826,34 @@ class TestBaseDocument(object):
         mock_sess.assert_called_once_with(myobj)
         mock_sess().add.assert_called_once_with(myobj)
         mock_sess().flush.assert_called_once_with()
+
+    def test_is_batchable(self, memory_db, db_session):
+        ParentB = ESMetaclass('ParentB', (docs.BaseDocument,), {
+            '__tablename__': 'parentb',
+            'id': fields.IdField(primary_key=True),
+            'childrenb': fields.Relationship(
+                document='ChildB',
+                backref_name='parentb'
+            )
+        })
+        ChildB = ESMetaclass('ChildB', (docs.BaseDocument,), {
+            '__tablename__': 'childb',
+            'id': fields.IdField(primary_key=True),
+            'parentb_id': fields.ForeignKeyField(
+                ref_column='parentb.id',
+                ref_column_type=fields.IdField,
+                ref_document='ParentB'
+            )
+        })
+        ChildB.pk_field()
+
+        params = {
+            'parentb': None
+        }
+        is_batchable = ChildB.is_update_batchable(params)
+        assert is_batchable
+        assert 'parentb' not in params
+        assert 'parentb_id' in params
 
     @patch.object(docs.BaseMixin, '_update')
     def test_update_error(self, mock_upd, simple_model, memory_db):

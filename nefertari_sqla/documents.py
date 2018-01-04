@@ -79,17 +79,19 @@ def is_object_document(document):
 
 def process_lists(_dict):
     for k in _dict:
-        new_k, _, _t = k.partition('__')
-        if _t == 'in' or _t == 'all':
-            _dict[k] = _dict.aslist(k)
+        if hasattr(k, 'partition'):
+            new_k, _, _t = k.partition('__')
+            if _t == 'in' or _t == 'all':
+                _dict[k] = _dict.aslist(k)
     return _dict
 
 
 def process_bools(_dict):
     for k in _dict:
-        new_k, _, _t = k.partition('__')
-        if _t == 'bool':
-            _dict[new_k] = _dict.pop_bool_param(k)
+        if hasattr(k, 'partition'):
+            new_k, _, _t = k.partition('__')
+            if _t == 'bool':
+                _dict[new_k] = _dict.pop_bool_param(k)
     return _dict
 
 
@@ -699,15 +701,7 @@ class BaseMixin(object):
                 params, synchronize_session=synchronize_session)
             updated_items = upd_queryset.all() if return_documents is True else []
         else:
-            is_batchable = True
-
-            # If params doesn't contain iterable values, we can batch update it
-            for key, value in params.items():
-                if isinstance(value, (list, dict)) or isinstance(value, BaseDocument):
-                    is_batchable = False
-                    break
-
-            if is_batchable:
+            if cls.is_update_batchable(params):
                 pk_field = cls.pk_field()
 
                 pks = []
@@ -730,6 +724,27 @@ class BaseMixin(object):
                 updated_items = items if return_documents is True else []
 
         return {"count": items_count, "items": updated_items}
+
+    @classmethod
+    def is_update_batchable(cls, params):
+        """
+        Determines whether the update_many is batchable
+        """
+        is_batchable = True
+        # If params doesn't contain iterable values, we can batch update it
+        for key, value in params.copy().items():
+            if isinstance(value, (list, dict, BaseDocument)):
+                is_batchable = False
+                break
+            # None can be assigned to a ForeignKey column
+            elif value is None:
+                attribute = getattr(cls, key, None)
+                if attribute and isinstance(attribute.property, RelationshipProperty):
+                    # Assigning the value to the foreignkey column rather than to the backref property
+                    [column] = attribute.property.local_columns
+                    del params[key]
+                    params[column.key] = value
+        return is_batchable
 
     @classmethod
     def _clean_queryset(cls, queryset):
