@@ -1,5 +1,6 @@
 import copy
 import logging
+from collections import defaultdict
 
 import six
 from sqlalchemy import text, inspect
@@ -1168,6 +1169,9 @@ class BaseDocument(BaseObject, BaseMixin):
     should be abstract as well (__abstract__ = True).
     """
     __abstract__ = True
+    _watchers = defaultdict(list)
+    _sort_methods = {}
+
 
     def save(self):
         session = object_session(self)
@@ -1192,6 +1196,7 @@ class BaseDocument(BaseObject, BaseMixin):
             session = object_session(self)
             session.add(self)
             session.flush()
+            self.watch_for_updates(params.keys())
             return self
         except (IntegrityError,) as e:
             if 'duplicate' not in e.args[0]:
@@ -1212,6 +1217,22 @@ class BaseDocument(BaseObject, BaseMixin):
         for document, backref_name in self.get_parent_documents():
             session.expire(document, [backref_name])
 
+    def watch_for_updates(self, fields):
+        for field in fields:
+            if field in self._watchers:
+                try:
+                    update_event = {'pk_value': getattr(self, self.pk_field()),
+                                   'new_value': getattr(self, field)}
+
+                    callbacks = self._watchers[field]
+
+                    for callback in callbacks:
+                        callback(update_event)
+
+                except Exception as e:
+                    log.error('Exception {} caused inside {}'.format(e, self._watchers[field]))
+                    pass
+
     @classmethod
     def get_field_params(cls, field_name):
         """ Get init params of column named :field_name:. """
@@ -1219,6 +1240,18 @@ class BaseDocument(BaseObject, BaseMixin):
         columns.update(cls._mapped_relationships())
         column = columns.get(field_name)
         return getattr(column, '_init_kwargs', None)
+
+    @classmethod
+    def add_field_watcher(cls, field_name, callback):
+        cls._watchers[field_name].append(callback)
+
+    @classmethod
+    def add_sort_method(cls, sort_name, method):
+        cls._sort_methods[sort_name] = method
+
+    @classmethod
+    def get_sort_method(cls, sort_name):
+        return cls._sort_methods.get(sort_name)
 
 
 class ESBaseDocument(six.with_metaclass(ESMetaclass, BaseDocument)):

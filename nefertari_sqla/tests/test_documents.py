@@ -992,6 +992,14 @@ class TestGetCollection(object):
         assert queryset._nefertari_meta['start'] == 0
         assert queryset._nefertari_meta['fields'] == []
 
+    def test_sort_method(self, simple_model, memory_db):
+        memory_db()
+        mock = Mock()
+        simple_model.add_sort_method('key', mock)
+        sort_method = simple_model.get_sort_method('key')
+        assert sort_method == mock
+        assert simple_model.get_sort_method('test') == None
+
 
 class TestSessionHolder:
 
